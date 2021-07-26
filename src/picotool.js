@@ -87,6 +87,10 @@ class PicoTool {
     await this.runCmd(0x05, rangeCmd, data);
   }
 
+  async exitXip() {
+    await this.runCmd(0x06);
+  }
+
   async runCmd(bCmdId, cmdData, transferLengthOrData) {
     const cmd = new ArrayBuffer(32);
     const view = new DataView(cmd);
@@ -150,4 +154,3 @@ class PicoTool {
     return new Uint8Array(transferInResult.data.buffer);
   }
 }
-
