@@ -1,7 +1,39 @@
 class PicoTool {
+  static ROM_START = 0x00000000;
+  static ROM_END = 0x00004000;
+  static FLASH_START = 0x10000000;
+  static FLASH_END = 0x11000000;
+  static XIP_SRAM_BASE = 0x15000000;
+  static XIP_SRAM_END = 0x15004000;
+
+  static SRAM_START = 0x20000000;
+  static SRAM_END = 0x20042000;
+
+  static SRAM_UNSTRIPED_START = 0x21000000;
+  static SRAM_UNSTRIPED_END = 0x21040000;
+
+  static PAGE_SIZE = 256;
+  static FLASH_SECTOR_ERASE_SIZE = 4096;
+
+  static NOT_EXCLUSIVE = 0;
+  static EXCLUSIVE = 1;
+  static EXCLUSIVE_AND_EJECT = 2;
+
+  static async requestDevice() {
+    return await navigator.usb.requestDevice({
+      filters: [
+        {
+          vendorId: 0x2e8a,
+          productId: 0x0003
+        }
+      ]
+    });
+  }
+
   constructor(usbDevice) {
     this.usbDevice = usbDevice;
     this.token = 0;
+    this.usbInterfaceNumber = undefined;
     this.outEndpointNumber = undefined;
     this.inEndpointNumber = undefined;
   }
@@ -9,11 +41,11 @@ class PicoTool {
   async open() {
     await this.usbDevice.open();
 
-    const usbInterfaceNumber =
+    this.usbInterfaceNumber =
       this.usbDevice.configuration.interfaces.length == 0 ? 0 : 1;
 
     const usbInterfaceAlternate = this.usbDevice.configuration.interfaces[
-      usbInterfaceNumber
+      this.usbInterfaceNumber
     ].alternates[0];
 
     if (usbInterfaceAlternate.interfaceClass !== 0xff) {
@@ -23,7 +55,7 @@ class PicoTool {
     this.outEndpointNumber = usbInterfaceAlternate.endpoints[0].endpointNumber;
     this.inEndpointNumber = usbInterfaceAlternate.endpoints[1].endpointNumber;
 
-    await this.usbDevice.claimInterface(usbInterfaceNumber);
+    await this.usbDevice.claimInterface(this.usbInterfaceNumber);
 
     this.token = 1;
   }
@@ -91,6 +123,40 @@ class PicoTool {
     await this.runCmd(0x06);
   }
 
+  async enterCmdXip() {
+    await this.runCmd(0x07);
+  }
+
+  async exec(dAddr) {
+    const addressOnlyCmd = new ArrayBuffer(8);
+    const view = new DataView(addressOnlyCmd);
+
+    // address_only_cmd
+    view.setUint32(0, dAddr, true); // dAddr
+
+    await this.runCmd(0x08, view);
+  }
+
+  async vectorizeFlash(dAddr) {
+    const addressOnlyCmd = new ArrayBuffer(8);
+    const view = new DataView(addressOnlyCmd);
+
+    // address_only_cmd
+    view.setUint32(0, dAddr, true); // dAddr
+
+    await this.runCmd(0x09, view);
+  }
+
+  async reset() {
+    await this.usbDevice.controlTransferOut({
+      requestType: "vendor",
+      recipient: "interface",
+      request: 0x41, // PICOBOOT_IF_RESET
+      value: 0x00,
+      index: this.usbInterfaceNumber
+    });
+  }
+
   async runCmd(bCmdId, cmdData, transferLengthOrData) {
     const cmd = new ArrayBuffer(32);
     const view = new DataView(cmd);
@@ -111,7 +177,7 @@ class PicoTool {
     if (cmdData !== undefined) {
       const cmdDataView = new DataView(cmdData);
 
-      for (var i = 0; i < cmdData.byteLength; i++) {
+      for (let i = 0; i < cmdData.byteLength; i++) {
         view.setUint8(16 + i, cmdDataView.getUint8(i));
       }
     }
