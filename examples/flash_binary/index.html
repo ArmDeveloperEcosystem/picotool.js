@@ -1,10 +1,14 @@
+<!--
+  Copyright (c) 2021 Arm Limited and Contributors. All rights reserved.
+
+  SPDX-License-Identifier: Apache-2.0
+-->
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Pico Flasher</title>
-
+    <title>picotool.js - Flash Binary</title>
 
     <!-- import the webpage's javascript file -->
     <script src="../../src/picotool.js" defer></script>
@@ -13,13 +17,18 @@
   <body>
     <!-- this is the start of content -->
     <h1>
-      Pico Flasher
+      picotool.js - Flash Binary example
     </h1>
     <p>
-      Use this web page to flash a binary image to your Raspbery Pi Pico board over USB with WebUSB enabled web browser.
-      
-      Choose a file below to start the process.
+      Use this web page to flash a binary image to your Raspbery Pi Pico board
+      over USB with a WebUSB enabled web browser. Choose a file below to start the
+      process.
     </p>
-    <input type="file" id="file" accept=".bin"/>
+    <p>
+      <b>NOTE:</b> The board must be in BOOTSEL mode.
+    </p>
+    <input type="file" id="file" accept=".bin" />
+    <hr />
+    <div id="status"></div>
   </body>
 </html>

@@ -1,71 +1,98 @@
+/*
+ * Copyright (c) 2021 Arm Limited and Contributors. All rights reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ */
+
 /* globals PicoTool */
 
 async function readFile(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
 
-        reader.addEventListener("load", event => {
-        resolve(event.target.result);
-        });
-
-        reader.readAsArrayBuffer(file);
+    reader.addEventListener("load", event => {
+      resolve(event.target.result);
     });
+
+    reader.readAsArrayBuffer(file);
+  });
 }
-  
+
 document.querySelector("#file").onchange = async event => {
+  const statusDiv = document.getElementById("status");
+
+  statusDiv.innerHTML = "";
+
+  try {
     const files = event.target.files;
-  
+
     if (files.length === 0) {
       return;
     }
-  
+
+    if (!("usb" in navigator)) {
+      throw new Error("Oh no! Your browser does not support WebUSB!");
+    }
+
+    statusDiv.innerHTML += "requesting device ... <br/>";
+    const usbDevice = await PicoTool.requestDevice();
+
     const fileData = await readFile(files[0]);
-  
-    const eraseSize =
-      Math.ceil(fileData.byteLength / PicoTool.FLASH_SECTOR_ERASE_SIZE) *
-      PicoTool.FLASH_SECTOR_ERASE_SIZE;
-  
-    const writeSize =
-      Math.ceil(fileData.byteLength / PicoTool.PAGE_SIZE) * PicoTool.PAGE_SIZE;
-  
-    const writeData = new ArrayBuffer(writeSize);
-  
+    const writeData = new ArrayBuffer(PicoTool.FLASH_SECTOR_ERASE_SIZE);
+
     const srcDataView = new DataView(fileData);
     const dstDataView = new DataView(writeData);
-  
-    for (let i = 0; i < fileData.byteLength; i++) {
-      dstDataView.setUint8(i, srcDataView.getUint8(i));
-    }
-  
-    console.log("requesting device ...");
-    const usbDevice = await PicoTool.requestDevice();
-  
+
     const picoTool = new PicoTool(usbDevice);
-  
-    console.log("opening device ...");
+
+    statusDiv.innerHTML += "opening device ... <br/>";
     await picoTool.open();
-  
-    console.log("reset ...");
+
+    statusDiv.innerHTML += "reset ... <br/>";
     await picoTool.reset();
-  
-    console.log("exlusive access device ...");
+
+    statusDiv.innerHTML += "exlusive access device ... <br/>";
     await picoTool.exlusiveAccess(1);
-  
-    console.log("exit xip");
+
+    statusDiv.innerHTML += "exit xip ... <br/>";
     await picoTool.exitXip();
-  
-    console.log("erase");
-    await picoTool.flashErase(PicoTool.FLASH_START, eraseSize);
-  
-    console.log("write");
-    await picoTool.write(PicoTool.FLASH_START, writeData);
-  
-    //     console.log("read");
-    //     console.log(await picoTool.read(PicoTool.FLASH_START, writeSize));
-  
-    console.log("rebooting device ...");
+
+    for (
+      let i = 0;
+      i < fileData.byteLength;
+      i += PicoTool.FLASH_SECTOR_ERASE_SIZE
+    ) {
+      let j = 0;
+      for (
+        j = 0;
+        j < PicoTool.FLASH_SECTOR_ERASE_SIZE && i + j < fileData.byteLength;
+        j++
+      ) {
+        dstDataView.setUint8(j, srcDataView.getUint8(i + j));
+      }
+
+      statusDiv.innerHTML += "erasing ... ";
+      await picoTool.flashErase(
+        PicoTool.FLASH_START + i,
+        PicoTool.FLASH_SECTOR_ERASE_SIZE
+      );
+
+      statusDiv.innerHTML += "writing ... ";
+      await picoTool.write(PicoTool.FLASH_START + i, writeData);
+
+      statusDiv.innerHTML +=
+        " " + (((i + j) * 100) / fileData.byteLength).toFixed(2) + "% <br/>";
+    }
+
+    statusDiv.innerHTML += "rebooting device ... <br/>";
     await picoTool.reboot(0, PicoTool.SRAM_END, 512);
-  
-    console.log("closing device ...");
+
+    statusDiv.innerHTML += "closing device ... <br/>";
     await picoTool.close();
+  } catch (e) {
+    statusDiv.innerHTML = "Error: " + e.message;
+  } finally {
+    document.querySelector("#file").value = null;
+  }
 };
