@@ -4,8 +4,9 @@ This library allows you to interact with a [Raspberry Pi Pico](https://www.raspb
 
 ## Examples
 
- * [Flash Binary](examples/flash_binary)
-   * Flash a `.bin` to the board in the browser
+ | Name | Description | Links |
+ | ---- | ----------- | ----- |
+ | Flash Binary | Flash a `.bin` to the board in the browser | [[demo]](https://armdeveloperecosystem.github.io/picotool.js/examples/flash_binary/) [[src]](examples/flash_binary)
 
 ## License
 
